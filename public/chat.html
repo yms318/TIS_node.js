@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Minsun's Chat</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet"
+	href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+<link
+	href="http://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.3.0/css/font-awesome.min.css"
+	rel="stylesheet" type="text/css">
+<style type="text/css">
+		.discussion {
+		  	list-style: none;
+		  	background: #ededed;
+		  	margin: 0;
+		  	padding: 0 0 50px 0;
+		}
+		
+		.discussion li {
+		  	padding: 0.5em;
+		  	overflow: hidden;
+		  	display: flex;
+		}
+		
+		.discussion .avatar {
+		  	width: 40px;
+		  	position: relative;
+		}
+		
+		.discussion .avatar img {
+		  	display: block;
+		  	width: 100%;
+		}
+		
+		.other .avatar:after {
+		  	content: "";
+		  	position: absolute;
+		  	top: 0;
+		  	right: 0;
+		  	width: 0;
+		  	height: 0;
+		  	border: 5px solid white;
+		  	border-left-color: transparent;
+		  	border-bottom-color: transparent;
+		}
+		
+		.self {
+		  	justify-content: flex-end;
+		  	align-items: flex-end;
+		}
+		
+		.self .messages {
+		  	order: 1;
+		  	border-bottom-right-radius: 0;
+		}
+		
+		.self .avatar {
+		  	order: 2;
+		}
+		
+		.self .avatar:after {
+		  	content: "";
+		  	position: absolute;
+		  	bottom: 0;
+		  	left: 0;
+		  	width: 0;
+		  	height: 0;
+		  	border: 5px solid white;
+		  	border-right-color: transparent;
+		  	border-top-color: transparent;
+		  	box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.2);
+		}
+		
+		.messages {
+		  	background: white;
+		  	padding: 10px;
+		  	border-radius: 2px;
+		  	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+		}
+		
+		.messages p {
+		  	font-size: 0.8em;
+		  	margin: 0 0 0.2em 0;
+		}
+		
+		.messages time {
+		  	font-size: 0.7em;
+		  	color: #ccc;
+		}
+
+</style>	
+	
+<script
+	src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<script
+	src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+<!-- socket.io참조-------------------------------------------------  -->
+<script type="text/javascript" src="/socket.io/socket.io.js"></script>
+<!-- -------------------------------------------------------------- -->
+<script type="text/javascript">
+var socket;
+$(function(){
+
+	disableChat();
+	socket=io.connect();
+
+	$('#btnRoomMake').click(function(){
+		//방 이름, 닉네임 얻어오기
+		var roomName=$('#roomname').val();
+		var nickName=$('#nickname').val();
+		if(!roomName){
+			alert('방이름을 입력하세요');
+			$('#roomname').focus();
+			return;
+		}
+		if(!nickName){
+			alert('닉네임을 입력하세요');
+			$('#nickname').focus();
+			return;
+		}
+		var str={
+			cmd:'create',	   //방생성 : cmd=>create
+			roomName:roomName, //방이름
+			nickName:nickName, //닉네임
+			owner:'hong'
+		}
+		socket.emit('room',str)
+
+		//방장 입장시키기
+		str={
+			cmd:'enter',
+			roomName:roomName,
+			nickName:nickName,
+			owner:'hong'
+		};
+		socket.emit('room',str);//서버에 방장이 입장함을 알린다.
+		$('#myinfo').html("MyInfo: #방이름 : "+roomName+", NickName : "+nickName)
+					.addClass('text-primary');
+	})//방만들기 끝--------------------
+
+	$('#btnEnter').click(function(){
+		//입장할 방 이름, 닉네임 얻기
+		var roomName=$('#roomname').val();
+		var nickName=$('#nickname').val();
+		alert(roomName+" "+nickName)
+		//유효성 체크---
+		var str={
+			cmd:'enter',
+			roomName:roomName,
+			nickName:nickName,
+			owner:'hong'
+		}
+		socket.emit('room',str);
+	});
+	//방 나가기 클릭했을 때----
+	$('#btnExit').click(function(){
+		var rname=$('#roomname').val();
+		var nick=$('#nickname').val();
+		var str={
+			cmd:'exit',
+			roomName:rname,
+			nickName:nick,
+		};
+		socket.emit('room',str);
+	})
+
+	//대화 메시지를 입력하고 엔터 쳤을 때
+	$('#inputMsg').keydown(function(e){
+		if(e.keyCode==13){//엔터 누르면
+			//서버에 메시지 전송 ==> 'message'이벤트를 발생시켜서 전송할 예정
+			var msg=$('#inputMsg').val();//대화 메시지
+			var roomName=$('#roomname').val();					
+			var nickName=$('#nickname').val();
+			var str={
+				roomName:roomName,//방이름
+				sender:nickName,//보내는이
+				receiver:'groupchat',//개별전송일 경우 받는 사람 닉네임 기술
+				type:'text',//보내는 데이터 형태
+				msg:msg//대화 메시지			
+			};
+			socket.emit('message',str);
+			$('#inputMsg').val('').focus();
+		}
+	})
+
+	socket.on('response',function(data){
+		print(data);
+		showStatus("응답 메시지 받음 : "+data.cmd+", "+data.code+", "+data.message);
+		var dcode=parseInt(data.code);
+		if(dcode==100){
+			alert('방이 생성되었어요');
+			enableChat();
+			btnDisable(true);
+		}else if(dcode==300){
+			alert(data.message);
+			btnDisable(false);
+		}else if(dcode==200){
+			enableChat();
+			btnDisable(true);
+		}else if(dcode==500){
+			disableChat();//채팅 패널 비활성화
+			btnDisable(false);
+		}
+	})//.on('response')end
+
+	socket.on('room',function(data){
+		var cmd=data.cmd;
+		if(cmd=='rlist'){
+			//방목록---
+		}else if(cmd=='ulist'){
+			//방에 입장한 참여자 목록을 보내주었다면
+			var userCnt=data.users.length;
+			var str="<p>입장한 User : "+userCnt+" 명</p><ul>";
+				for(var i=0;i<userCnt;i++){
+					var user=data.users[i];
+					str+="<li>"+user+"</li>";
+				}
+				str+="</ul>";
+			$('#ulist').html(str);
+		}
+	})//.on('room') end----------------------------
+	
+	socket.on('message',function(data){
+		print(JSON.stringify(data));
+		var sender=data.sender;
+		var type=data.type;
+		var msg=data.msg;
+		//var time=data.time;
+		if(type=='text'){
+			var str=sender+">>"+msg+"<br>";
+			$('#taMsg').append(str);
+		}
+	})//.on('message') end-------------------------
+
+})//$()end-----------------------------------------
+//방만들기, 입장하기 버튼 활성화 여부를 설정하는 함수
+function btnDisable(flag){
+	$('#btnRoomMake').prop('disabled',flag);//true=> 방생성 버튼 비활성화, false=>활성화
+	$('#btnEnter').prop('disabled',flag);//방입장 버튼 비활성화
+
+}//------------------------------------------------
+
+function print(data){
+	console.log(data);
+}
+function showStatus(str){
+	$('#status').html(str)
+	.css('color','red').css('font-weight','bold');
+}
+//채팅 비활성화 -> 초기에, 방에서 퇴장시
+function disableChat(){
+	$('#inputMsg').attr('readonly',true);
+	$('#taMsg').attr('readonly',true);
+}
+//채팅 활성화 -> 방에 입장시
+function enableChat(){
+	$('#inputMsg').attr('readonly',false);
+	$('#taMsg').attr('readonly',false);
+}
+</script>	
+
+</head>
+<body>
+	<div class="container">
+		<div class="section">
+			<div class="row">
+				<div class="col-md-12">
+					<h1 class="text-center text-primary">
+						<a><i class="fa fa-fw fa-heart-o fa-lg hub"></i></a>유민소니의
+						채팅<a><i class="fa fa-fw fa-heart-o fa-lg hub"></i></a>
+					</h1>
+					
+
+					<div class="panel-group" style="margin-top: 30px;">
+
+
+						<div class="panel panel-danger col-md-7" id="roommake"
+							style="height: 250px;">
+							<div class="panel-heading">
+								<a style="color: #d9534f;"><i
+									class="fa fa-2x fa-fw hub fa-home"></i></a>방만들기
+							</div>
+							<div class="panel-body">
+								<div class="row">
+									<label class="col-md-3" for="roomname">방이름 :</label>
+									<div class="col-md-9">
+										<input id="roomname" type="text" class="form-control"
+											placeholder="방이름">
+									</div>
+								</div>
+								<div class="row" style="margin-top: 8px; margin-bottom: 10px">
+									<label class="col-md-3" for="nickname">닉네임 :</label>
+									<div class="col-md-9">
+										<input id="nickname" type="text" class="form-control"
+											placeholder="닉네임">
+									</div>
+								</div>
+								<div class="row">
+									<div class="col-md-12 text-right">
+
+										<input id="btnRoomMake" type="button" value="방만들기"
+											class="btn btn-primary">
+										<button class="btn btn-warning" id="btnRename">방이름 변경</button>
+										<button class="btn btn-danger" id="btnRemove">방 삭제</button>
+										<button class="btn btn-info" id="btnEnter">방에 입장</button>
+										<button class="btn btn-success" id="btnExit">방나가기</button>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div class="panel panel-warning col-md-4" id="room"
+							style="height: 250px; overflow: auto; margin-left: 10px">
+							<div class="panel-heading">
+								<a style="color: #d9534f;"><i class="fa fa-2x fa-fw fa-list"></i></a>개설된
+								방목록
+								
+							</div>
+							<div class="panel-body">
+								<div id="roomlist">
+									<!-- <ol >
+										<li>One</li>
+										<li>Two</li>
+										<li>Three</li>
+									</ol> -->
+								</div>
+							</div>
+						</div>
+
+						<div class="panel panel-info col-md-11" id="chatroom"
+							style="margin-top: 13px">
+							<div class="panel-heading">
+								<a><i class="fa fa-3x fa-fw fa-comments-o"></i></a>:::Chat:::
+								<div id="myinfo"></div>
+								<div id="status"></div>
+							</div>
+							<div class="panel-body">
+								<div id="chatmsg" class="col-md-10 col-md-offset-1">
+									<div class="row">
+										<label class="col-md-3 text-right" for="nickname">메시지
+											:</label>
+										<div class="col-md-9">
+											<input id="inputMsg" type="text" class="form-control"
+												placeholder="메시지를 입력하세요">
+										</div>
+									</div>
+									<div class="row" style="margin-top: 10px">
+										<div class="col-md-3" id="ulist">
+										</div>
+										<div class="col-md-9">
+											<div id="taMsg"
+											 class="discussion" style="width:100%;height:400px;overflow: auto" readonly class="form-control"></div>
+										</div>
+										
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+					
+					
+
+				</div>
+			</div>
+		</div>
+	</div>
+</body>
+</html>

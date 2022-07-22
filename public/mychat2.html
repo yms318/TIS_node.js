@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Document</title>
+    <!-- Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">
+    <!-- jQuery library -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <!-- Popper JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+    <!-- Latest compiled JavaScript -->
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js"></script>
+    <!-- ------------------------------------- -->
+    <script src="/socket.io/socket.io.js"></script>
+    <!-- ------------------------------------- -->
+    <script>
+        var socket;
+        $(function(){
+            //소켓 생성
+            socket=io.connect();
+            $('#btn').click(function(){
+               send();
+            });
+            
+            //텍스트박스에 엔터값 누르면 전송하기
+            $('#txt').keyup(function(e){
+                if(e.keyCode==13){
+                    send();
+                }
+            });
+
+            //서버가 보낸 메시지를 받아서 div#msg 영역에 출력해보기
+            socket.on('sendBroad',function(data){
+                $('#msg').append(data+"<br>")
+                         .css('color','blue')
+            })
+        });
+        function send(){
+             //#txt에 입력한 값 받아서 서버로 전송=>이벤트('hello')를 발생시켜 전송한다.
+             var mymsg=$('#txt').val();
+                socket.emit('hello',mymsg);
+                //emit('이벤트종류',데이터) 강제로 이벤트를 발생시킴
+                $('#txt').val('');
+                $('#txt').focus();
+        }
+    </script>
+
+</head>
+<body>
+    <div class="container">
+        <h1>Simple Chat-broadcast</h1>
+        <h3>나를 제외한 접속자들에게 메시지를 보내보자!</h3>
+        <div class="row">
+            <div class="col-md-8">
+                <input type="text" id="txt" class="form-control" placeholder="Message">
+                <button id="btn" class="btn btn-primary">
+                    Echo
+                </button>
+            </div>
+        </div>
+
+        <div class="row">
+            <div id="msg" class="col-md-8">
+                <div id="msg">
+
+                </div>
+            </div>
+         </div>
+    </div>
+</body>
+</html>
